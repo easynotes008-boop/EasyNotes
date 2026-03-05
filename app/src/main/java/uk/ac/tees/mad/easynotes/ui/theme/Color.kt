@@ -1,4 +1,4 @@
-package uk.ac.tees.mad.easynotes.ui.theme
+package uk.ac.tees.mad.easynotes.presentation.theme
 
 import androidx.compose.ui.graphics.Color
 
