@@ -7,6 +7,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import uk.ac.tees.mad.easynotes.presentation.screens.auth.AuthScreen
+import uk.ac.tees.mad.easynotes.presentation.screens.auth.AuthViewModel
 
 import uk.ac.tees.mad.easynotes.presentation.screens.splash.SplashScreen
 import uk.ac.tees.mad.easynotes.presentation.screens.splash.SplashViewModel
@@ -38,15 +40,15 @@ fun EasyNotesNavGraph(
         }
 
         composable(Screen.Auth.route) {
-//            val viewModel: AuthViewModel = viewModel()
-//            AuthScreen(
-//                viewModel = viewModel,
-//                onNavigateToHome = {
-//                    navController.navigate(Screen.Home.route) {
-//                        popUpTo(Screen.Auth.route) { inclusive = true }
-//                    }
-//                }
-//            )
+            val viewModel: AuthViewModel = viewModel()
+            AuthScreen(
+                viewModel = viewModel,
+                onNavigateToHome = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Auth.route) { inclusive = true }
+                    }
+                }
+            )
         }
 //
 //        composable(Screen.Home.route) {
