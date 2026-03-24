@@ -148,7 +148,7 @@ fun SubjectsList(
             SubjectCard(
                 subject = subject,
                 onClick = { onSubjectClick(subject.id) },
-                onLongClick = { onSubjectLongClick(subject) },
+                onLongClick = { onSubjectLongClick(subject) }
             )
         }
     }
