@@ -88,8 +88,8 @@ fun SettingsScreen(
 
                 SettingsItem(
                     icon = Icons.Default.Code,
-                    title = "Developer",
-                    subtitle = "EasyNotes Team",
+                    title = "App Name",
+                    subtitle = "EasyNotes",
                     onClick = {}
                 )
             }

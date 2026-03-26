@@ -11,6 +11,10 @@ import uk.ac.tees.mad.easynotes.presentation.screens.auth.AuthScreen
 import uk.ac.tees.mad.easynotes.presentation.screens.auth.AuthViewModel
 import uk.ac.tees.mad.easynotes.presentation.screens.home.HomeScreen
 import uk.ac.tees.mad.easynotes.presentation.screens.home.HomeViewModel
+import uk.ac.tees.mad.easynotes.presentation.screens.notes.NotesScreen
+import uk.ac.tees.mad.easynotes.presentation.screens.notes.NotesViewModel
+import uk.ac.tees.mad.easynotes.presentation.screens.settings.SettingsScreen
+import uk.ac.tees.mad.easynotes.presentation.screens.settings.SettingsViewModel
 
 import uk.ac.tees.mad.easynotes.presentation.screens.splash.SplashScreen
 import uk.ac.tees.mad.easynotes.presentation.screens.splash.SplashViewModel
@@ -65,41 +69,41 @@ fun EasyNotesNavGraph(
                 }
             )
         }
-//
-//        composable(
-//            route = Screen.Notes.route,
-//            arguments = listOf(
-//                navArgument(Screen.Notes.SUBJECT_ID_ARG) {
-//                    type = NavType.StringType
-//                }
-//            )
-//        ) { backStackEntry ->
-//            val subjectId = backStackEntry.arguments?.getString(Screen.Notes.SUBJECT_ID_ARG)
-//            requireNotNull(subjectId)
-//
-//            val viewModel: NotesViewModel = viewModel()
-//            NotesScreen(
-//                viewModel = viewModel,
-//                subjectId = subjectId,
-//                onNavigateBack = {
-//                    navController.popBackStack()
-//                }
-//            )
-//        }
-//
-//        composable(Screen.Settings.route) {
-//            val viewModel: SettingsViewModel = viewModel()
-//            SettingsScreen(
-//                viewModel = viewModel,
-//                onNavigateBack = {
-//                    navController.popBackStack()
-//                },
-//                onLogout = {
-//                    navController.navigate(Screen.Auth.route) {
-//                        popUpTo(0) { inclusive = true }
-//                    }
-//                }
-//            )
-//        }
+
+        composable(
+            route = Screen.Notes.route,
+            arguments = listOf(
+                navArgument(Screen.Notes.SUBJECT_ID_ARG) {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val subjectId = backStackEntry.arguments?.getString(Screen.Notes.SUBJECT_ID_ARG)
+            requireNotNull(subjectId)
+
+            val viewModel: NotesViewModel = viewModel()
+            NotesScreen(
+                viewModel = viewModel,
+                subjectId = subjectId,
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.Settings.route) {
+            val viewModel: SettingsViewModel = viewModel()
+            SettingsScreen(
+                viewModel = viewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onLogout = {
+                    navController.navigate(Screen.Auth.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
     }
 }
