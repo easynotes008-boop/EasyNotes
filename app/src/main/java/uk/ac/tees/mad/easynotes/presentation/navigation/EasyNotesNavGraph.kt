@@ -15,7 +15,6 @@ import uk.ac.tees.mad.easynotes.presentation.screens.notes.NotesScreen
 import uk.ac.tees.mad.easynotes.presentation.screens.notes.NotesViewModel
 import uk.ac.tees.mad.easynotes.presentation.screens.settings.SettingsScreen
 import uk.ac.tees.mad.easynotes.presentation.screens.settings.SettingsViewModel
-
 import uk.ac.tees.mad.easynotes.presentation.screens.splash.SplashScreen
 import uk.ac.tees.mad.easynotes.presentation.screens.splash.SplashViewModel
 
@@ -92,7 +91,12 @@ fun EasyNotesNavGraph(
         }
 
         composable(Screen.Settings.route) {
-            val viewModel: SettingsViewModel = viewModel()
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val viewModel: SettingsViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+                factory = androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(
+                    context.applicationContext as android.app.Application
+                )
+            )
             SettingsScreen(
                 viewModel = viewModel,
                 onNavigateBack = {

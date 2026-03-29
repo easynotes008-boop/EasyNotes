@@ -1,10 +1,12 @@
 package uk.ac.tees.mad.easynotes.presentation.screens.settings
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import uk.ac.tees.mad.easynotes.data.preferences.UserPreferencesManager
 
 data class SettingsUiState(
     val themePreference: ThemePreference = ThemePreference.SYSTEM,
@@ -12,15 +14,17 @@ data class SettingsUiState(
     val isLoading: Boolean = false
 )
 
-class SettingsViewModel : ViewModel() {
+class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val auth = FirebaseAuth.getInstance()
+    private val preferencesManager = UserPreferencesManager(application)
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
         loadUser()
+        loadThemePreference()
     }
 
     private fun loadUser() {
@@ -32,9 +36,17 @@ class SettingsViewModel : ViewModel() {
         }
     }
 
+    private fun loadThemePreference() {
+        viewModelScope.launch {
+            preferencesManager.themePreferenceFlow.collect { theme ->
+                _uiState.update { it.copy(themePreference = theme) }
+            }
+        }
+    }
+
     fun updateTheme(theme: ThemePreference) {
         viewModelScope.launch {
-            _uiState.update { it.copy(themePreference = theme) }
+            preferencesManager.updateThemePreference(theme)
         }
     }
 
