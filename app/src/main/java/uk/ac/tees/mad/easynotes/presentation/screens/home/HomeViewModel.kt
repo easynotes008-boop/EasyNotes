@@ -1,12 +1,15 @@
 package uk.ac.tees.mad.easynotes.presentation.screens.home
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import uk.ac.tees.mad.easynotes.data.local.DatabaseProvider
+import uk.ac.tees.mad.easynotes.data.local.SubjectEntity
 import uk.ac.tees.mad.easynotes.domain.model.Subject
 import java.util.UUID
 
@@ -17,10 +20,12 @@ data class HomeUiState(
     val isSyncing: Boolean = false
 )
 
-class HomeViewModel : ViewModel() {
+class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
+    private val database = DatabaseProvider.getDatabase(application)
+    private val subjectDao = database.subjectDao()
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -35,49 +40,51 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
+            subjectDao.getSubjectsFlow(userId).collect { entities ->
+                val subjects = entities.map { it.toDomain() }
+                _uiState.update {
+                    it.copy(
+                        subjects = subjects,
+                        isLoading = false,
+                        error = null
+                    )
+                }
+            }
+        }
+
+        syncFromFirestore()
+    }
+
+    private fun syncFromFirestore() {
+        val userId = auth.currentUser?.uid ?: return
+
+        viewModelScope.launch {
             try {
                 firestore.collection("users")
                     .document(userId)
                     .collection("subjects")
                     .addSnapshotListener { snapshot, error ->
-                        if (error != null) {
-                            _uiState.update {
-                                it.copy(
-                                    isLoading = false,
-                                    error = error.message
-                                )
+                        if (error != null) return@addSnapshotListener
+
+                        snapshot?.documents?.let { docs ->
+                            viewModelScope.launch {
+                                val entities = docs.mapNotNull { doc ->
+                                    SubjectEntity(
+                                        id = doc.id,
+                                        userId = userId,
+                                        name = doc.getString("name") ?: "",
+                                        color = doc.getString("color") ?: "#6200EE",
+                                        createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
+                                        updatedAt = doc.getLong("updatedAt") ?: System.currentTimeMillis(),
+                                        lastNotePreview = doc.getString("lastNotePreview") ?: "",
+                                        noteCount = doc.getLong("noteCount")?.toInt() ?: 0
+                                    )
+                                }
+                                subjectDao.insertSubjects(entities)
                             }
-                            return@addSnapshotListener
-                        }
-
-                        val subjects = snapshot?.documents?.mapNotNull { doc ->
-                            Subject(
-                                id = doc.id,
-                                userId = userId,
-                                name = doc.getString("name") ?: "",
-                                color = doc.getString("color") ?: "#6200EE",
-                                createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
-                                updatedAt = doc.getLong("updatedAt") ?: System.currentTimeMillis(),
-                                lastNotePreview = doc.getString("lastNotePreview") ?: "",
-                                noteCount = doc.getLong("noteCount")?.toInt() ?: 0
-                            )
-                        }?.sortedByDescending { it.updatedAt } ?: emptyList()
-
-                        _uiState.update {
-                            it.copy(
-                                subjects = subjects,
-                                isLoading = false,
-                                error = null
-                            )
                         }
                     }
             } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = e.message
-                    )
-                }
             }
         }
     }
@@ -88,11 +95,26 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val subjectId = UUID.randomUUID().toString()
+                val now = System.currentTimeMillis()
+
+                val entity = SubjectEntity(
+                    id = subjectId,
+                    userId = userId,
+                    name = name,
+                    color = color,
+                    createdAt = now,
+                    updatedAt = now,
+                    lastNotePreview = "",
+                    noteCount = 0
+                )
+
+                subjectDao.insertSubject(entity)
+
                 val subject = hashMapOf(
                     "name" to name,
                     "color" to color,
-                    "createdAt" to System.currentTimeMillis(),
-                    "updatedAt" to System.currentTimeMillis(),
+                    "createdAt" to now,
+                    "updatedAt" to now,
                     "lastNotePreview" to "",
                     "noteCount" to 0
                 )
@@ -115,6 +137,9 @@ class HomeViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
+                subjectDao.deleteSubject(subjectId)
+                database.noteDao().deleteAllNotesForSubject(subjectId)
+
                 firestore.collection("users")
                     .document(userId)
                     .collection("subjects")
@@ -141,6 +166,7 @@ class HomeViewModel : ViewModel() {
     fun refresh() {
         viewModelScope.launch {
             _uiState.update { it.copy(isSyncing = true) }
+            syncFromFirestore()
             kotlinx.coroutines.delay(1000)
             _uiState.update { it.copy(isSyncing = false) }
         }
