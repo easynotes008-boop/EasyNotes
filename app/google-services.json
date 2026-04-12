@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "463671229845",
-    "project_id": "easy-notes-72f50",
-    "storage_bucket": "easy-notes-72f50.firebasestorage.app"
+    "project_number": "247931697815",
+    "project_id": "easynotes-e9b23",
+    "storage_bucket": "easynotes-e9b23.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:463671229845:android:07fc6c27c0f86cca7fca9c",
+        "mobilesdk_app_id": "1:247931697815:android:5747a380aa6c19c427c7d2",
         "android_client_info": {
           "package_name": "uk.ac.tees.mad.easynotes"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBvWeCkvbXpj3GYF_WzesP9FkX53oOLnBg"
+          "current_key": "AIzaSyAuKmtThtLVSV9tvt3TJbNGDlhkmQYhTsQ"
         }
       ],
       "services": {

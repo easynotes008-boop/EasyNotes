@@ -1,12 +1,15 @@
 package uk.ac.tees.mad.easynotes.presentation.screens.notes
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import uk.ac.tees.mad.easynotes.data.local.DatabaseProvider
+import uk.ac.tees.mad.easynotes.data.local.NoteEntity
 import uk.ac.tees.mad.easynotes.domain.model.Note
 import uk.ac.tees.mad.easynotes.domain.model.Subject
 import java.util.UUID
@@ -20,10 +23,13 @@ data class NotesUiState(
     val showDeleteDialog: Boolean = false
 )
 
-class NotesViewModel : ViewModel() {
+class NotesViewModel(application: Application) : AndroidViewModel(application) {
 
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
+    private val database = DatabaseProvider.getDatabase(application)
+    private val noteDao = database.noteDao()
+    private val subjectDao = database.subjectDao()
 
     private val _uiState = MutableStateFlow(NotesUiState())
     val uiState: StateFlow<NotesUiState> = _uiState.asStateFlow()
@@ -40,6 +46,9 @@ class NotesViewModel : ViewModel() {
         val userId = auth.currentUser?.uid ?: return
 
         viewModelScope.launch {
+            val entity = subjectDao.getSubjectById(subjectId)
+            _uiState.update { it.copy(subject = entity?.toDomain()) }
+
             try {
                 val doc = firestore.collection("users")
                     .document(userId)
@@ -63,7 +72,6 @@ class NotesViewModel : ViewModel() {
 
                 _uiState.update { it.copy(subject = subject) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message) }
             }
         }
     }
@@ -74,6 +82,25 @@ class NotesViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
+            noteDao.getNotesFlow(subjectId).collect { entities ->
+                val notes = entities.map { it.toDomain() }
+                _uiState.update {
+                    it.copy(
+                        notes = notes,
+                        isLoading = false,
+                        error = null
+                    )
+                }
+            }
+        }
+
+        syncFromFirestore()
+    }
+
+    private fun syncFromFirestore() {
+        val userId = auth.currentUser?.uid ?: return
+
+        viewModelScope.launch {
             try {
                 firestore.collection("users")
                     .document(userId)
@@ -81,44 +108,25 @@ class NotesViewModel : ViewModel() {
                     .document(subjectId)
                     .collection("notes")
                     .addSnapshotListener { snapshot, error ->
-                        if (error != null) {
-                            _uiState.update {
-                                it.copy(
-                                    isLoading = false,
-                                    error = error.message
-                                )
+                        if (error != null) return@addSnapshotListener
+
+                        snapshot?.documents?.let { docs ->
+                            viewModelScope.launch {
+                                val entities = docs.mapNotNull { doc ->
+                                    NoteEntity(
+                                        id = doc.id,
+                                        subjectId = subjectId,
+                                        title = doc.getString("title") ?: "",
+                                        content = doc.getString("content") ?: "",
+                                        createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
+                                        updatedAt = doc.getLong("updatedAt") ?: System.currentTimeMillis()
+                                    )
+                                }
+                                noteDao.insertNotes(entities)
                             }
-                            return@addSnapshotListener
                         }
-
-                        val notes = snapshot?.documents?.mapNotNull { doc ->
-                            Note(
-                                id = doc.id,
-                                subjectId = subjectId,
-                                title = doc.getString("title") ?: "",
-                                content = doc.getString("content") ?: "",
-                                createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
-                                updatedAt = doc.getLong("updatedAt") ?: System.currentTimeMillis()
-                            )
-                        }?.sortedByDescending { it.updatedAt } ?: emptyList()
-
-                        _uiState.update {
-                            it.copy(
-                                notes = notes,
-                                isLoading = false,
-                                error = null
-                            )
-                        }
-
-                        updateSubjectPreview(notes)
                     }
             } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = e.message
-                    )
-                }
             }
         }
     }
@@ -130,6 +138,17 @@ class NotesViewModel : ViewModel() {
             try {
                 val noteId = UUID.randomUUID().toString()
                 val now = System.currentTimeMillis()
+
+                val entity = NoteEntity(
+                    id = noteId,
+                    subjectId = subjectId,
+                    title = title,
+                    content = content,
+                    createdAt = now,
+                    updatedAt = now
+                )
+
+                noteDao.insertNote(entity)
 
                 val note = hashMapOf(
                     "title" to title,
@@ -147,6 +166,8 @@ class NotesViewModel : ViewModel() {
                     .set(note)
                     .await()
 
+                updateSubjectPreview()
+
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
             }
@@ -158,10 +179,13 @@ class NotesViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
+                val updatedNote = note.copy(updatedAt = System.currentTimeMillis())
+                noteDao.insertNote(NoteEntity.fromDomain(updatedNote))
+
                 val updates = hashMapOf<String, Any>(
-                    "title" to note.title,
-                    "content" to note.content,
-                    "updatedAt" to System.currentTimeMillis()
+                    "title" to updatedNote.title,
+                    "content" to updatedNote.content,
+                    "updatedAt" to updatedNote.updatedAt
                 )
 
                 firestore.collection("users")
@@ -172,6 +196,8 @@ class NotesViewModel : ViewModel() {
                     .document(note.id)
                     .update(updates)
                     .await()
+
+                updateSubjectPreview()
 
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
@@ -203,6 +229,8 @@ class NotesViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
+                noteDao.deleteNote(note.id)
+
                 firestore.collection("users")
                     .document(userId)
                     .collection("subjects")
@@ -212,6 +240,7 @@ class NotesViewModel : ViewModel() {
                     .delete()
                     .await()
 
+                updateSubjectPreview()
                 hideDeleteDialog()
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message) }
@@ -220,11 +249,12 @@ class NotesViewModel : ViewModel() {
         }
     }
 
-    private fun updateSubjectPreview(notes: List<Note>) {
+    private fun updateSubjectPreview() {
         val userId = auth.currentUser?.uid ?: return
 
         viewModelScope.launch {
             try {
+                val notes = noteDao.getNotesFlow(subjectId).first()
                 val preview = notes.firstOrNull()?.content?.take(100) ?: ""
                 val count = notes.size
 
